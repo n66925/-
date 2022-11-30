@@ -1,1 +1,70 @@
-# -
+</div>
+ </header>
+<h1>تولید شعر با شبکه عصبی LSTM و تنسورفلو</h1>
+
+        
+        
+ <div class="post-body renderEditorData">
+  <figure class="md-block-image md-block-image-has-caption md-block-rtl"><img src="https://files.virgool.io/upload/users/1223901/posts/rynq4emx1qcx/5bqtxkgjyhop.jpeg" alt="منبع : cnn" data-action="zoom"><figcaption classname="md-block-image-caption">منبع : cnn</figcaption></figure><p class="md-block-unstyled md-block-rtl">یادگیری عمیق ابزاری فوق العاده برای ساخت پروژه های مهیج و سرگرم‌کننده است، هر روز خبری در مورد کاربرد های جدید یادگیری عمیق منتشر میشود و همگان را در تعجب فرو میبرد، آموزش این مدل های جذاب هم در نوع خودش سرگرم‌کننده است مخصوصا مدل های مرتبط به پردازش زبان طبیعی(NLP).</p><p class="md-block-unstyled md-block-rtl">در این ویرگول میخواهم نشان بدهم چگونه میتوان از یادگیری عمیق برای تولید شعر استفاده کنیم، مدلی که خواهیم ساخت، ارتباط بین کارکتر ها را متوجه میشود و احتمال وقوع کارکتر بعدی را محاسبه میکند.</p><blockquote class="md-block-blockquote md-block-rtl">در این پروژه از شبکه عصبی LSTM استفاده خواهیم کرد. به طور خلاصه، LSTM یک نوع خاص از یک شبکه عصبی  RNN است که در پردازش داده هایی که دارای توالی منظم و مرتبط هستند استفاده میشود. مثل متون، موسیقی ها، ویدئو ها و...<br><br>تفاوت RNN ها با شبکه های عصبی کلاسیک داشتن وابستگی زمانی یا اثر حافظه است که داده های قبلی را در حافظه به خاطر میسپارد تا در تصمیم گیری های بعدی استفاده کند.<br><a class="md-inline-link" href="https://l.vrgl.ir/r?l=https%3A%2F%2Fcolah.github.io%2Fposts%2F2015-08-Understanding-LSTMs%2F&amp;st=post&amp;si=rynq4emx1qcx&amp;k=qToANxWsJZcbp30NlTE%2FGPXPRobbWIVbY2orsTBmE0E%3D" target="_blank" rel="noopener nofollow">برای مطالعه بیشتر</a></blockquote><h4 class="md-block-header-four md-block-rtl">آماده سازی</h4><p class="md-block-unstyled md-block-rtl">برای شروع به تنسورفلو و نامپای نیاز خواهیم داشت که میتوانید با دستور زیر آنها را نصب کنید :</p><blockquote class="md-block-blockquote md-block-ltr">pip install -U tensorflow-gpu<br>pip install -U numpy</blockquote><p class="md-block-unstyled md-block-rtl">ما از دیوان حافظ استفاده میکنیم اما میتوانید برای دقت بیشتر از اشعار سعدی یا فردوسی استفاده کنید(یا هرنوع متن بالای 100 هزار کارکتر)، اشعار حافظ را با دستور زیر دریافت میکنیم :</p><pre class="md-block-code"><span class="line-number"><span>1</span></span><span class="code-container">wget -O hafez.txt https://raw.githubusercontent.com/amnghd/Persian_poems_corpus/master/normalized/hafez_norm.txt</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><p class="md-block-unstyled md-block-rtl">ابزار های مورد نیاز را ایمپورت میکنیم و سپس محتوای کتاب را میخوانیم :</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></span><span class="code-container">import tensorflow as tf
+import keras
+from keras.layers import  Input, LSTM, Dense
+import tensorflow.keras.optimizers as optimizers
+import numpy as np
+import random
+
+text = open(&amp;quothafez.txt&amp;quot, &amp;quotr&amp;quot, encoding=&amp;quotutf-8&amp;quot).read()</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><h4 class="md-block-header-four md-block-rtl">پردازش متن و ایجاد دیتاست</h4><p class="md-block-unstyled md-block-rtl">شبکه عصبی نمیتواند داده ها به صورت متنی دریافت کند، برای همین باید کارکتر ها را به اعداد صحیح تبدیل کنیم :</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span></span><span class="code-container">chars = sorted(list(set(text)))
+char_indices = dict((c, i) for i, c in enumerate(chars))
+indices_char = dict((i, c) for i, c in enumerate(chars))</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><p class="md-block-unstyled md-block-rtl">برای تولید متن مدل با دیدن کارکتر های قبل یاد میگیرد که کارکتر بعدی کدام است :</p><figure class="md-block-image md-block-ltr"><img src="https://files.virgool.io/upload/users/1223901/posts/rynq4emx1qcx/5378m1t6nquv.jpeg" alt="" data-action="zoom"></figure><p class="md-block-unstyled md-block-rtl">پس با توجه به تصویر بالا، input ها یک ایندکس از آخر عقب تر از target ها هستند و target ها نیز یک ایندکس از اول جلوتر از input ها هستند، پس به این شیوه متغییر های x و y رو میسازیم:</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span></span><span class="code-container">maxlen = 40
+step = 3
+sentences = []
+next_chars = []
+for i in range(0, len(text) - maxlen, step):
+    sentences.append(text[i : i + maxlen])
+    next_chars.append(text[i + maxlen])
+x = np.zeros((len(sentences), maxlen, len(chars)), dtype=np.bool)
+y = np.zeros((len(sentences), len(chars)), dtype=np.bool)
+for i, sentence in enumerate(sentences):
+    for t, char in enumerate(sentence):
+        x[i, t, char_indices[char]] = 1
+    y[i, char_indices[next_chars[i]]] = 1</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><h4 class="md-block-header-four md-block-rtl">مدل سازی</h4><p class="md-block-unstyled md-block-rtl">حالا میتوانیم مدل LSTM خود را تعریف کنیم. در اینجا از یک لایه LSTM با 128 واحد حافظه به عنوان حافظه پنهان و لایه خروجی یک Dense layer هست که از تابع softmax استفاده میکند، برای بهینه ساز هم از Adam استفاده میکنیم :</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span></span><span class="code-container">model = keras.Sequential(
+    [
+        keras.Input(shape=(maxlen, len(chars))),
+        layers.LSTM(128),
+        layers.Dense(len(chars), activation=&amp;quotsoftmax&amp;quot),
+    ]
+)
+optimizer = optimizers.Adam(learning_rate=0.01)
+model.compile(loss=&amp;quotcategorical_crossentropy&amp;quot, optimizer=optimizer)</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><p class="md-block-unstyled md-block-rtl">به دلیل اینکه مدل برای پیش‌بینی کارکتر بعدی، احتمال هر کارکتر را برمیگرداند، یک تابع برای text sampling نیاز خواهیم داشت :</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></span><span class="code-container">def sample(preds, temperature=1.0):
+    # helper function to sample an index from a probability array
+    preds = np.asarray(preds).astype(&amp;quotfloat64&amp;quot)
+    preds = np.log(preds) / temperature
+    exp_preds = np.exp(preds)
+    preds = exp_preds / np.sum(exp_preds)
+    probas = np.random.multinomial(1, preds, 1)
+    return np.argmax(probas)</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><p class="md-block-unstyled md-block-rtl">و در آخر آموزش مدل را آموزش میدهیم :</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span><span>4</span></span><span class="code-container">epochs&nbsp;=&nbsp;40
+batch_size&nbsp;=&nbsp;128
+
+model.fit(x,&nbsp;y,&nbsp;batch_size=batch_size,&nbsp;epochs=40)</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><p class="md-block-unstyled md-block-rtl">آموزش مدل روی NVIDIA Tesla K50 حدود دو دقیقه طول کشید. حالا میتوانیم مدل را تست کنیم :</p><pre class="md-block-code"><span class="line-number"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span></span><span class="code-container">for i in range(10):
+    start_index = random.randint(0, len(text) - maxlen - 1)
+    for diversity in [0.2, 0.5, 1.0, 1.2]:
+        print(&amp;quot...Diversity:&amp;quot, diversity)
+
+        generated = &amp;quot&amp;quot
+        sentence = text[start_index : start_index + maxlen]
+        print('...Generating with seed: &amp;quot' + sentence + '&amp;quot')
+
+        for i in range(400):
+            x_pred = np.zeros((1, maxlen, len(chars)))
+            for t, char in enumerate(sentence):
+                x_pred[0, t, char_indices[char]] = 1.0
+            preds = model.predict(x_pred, verbose=0)[0]
+            next_index = sample(preds, diversity)
+            next_char = indices_char[next_index]
+            sentence = sentence[1:] + next_char
+            generated += next_char
+
+        print(&amp;quot...Generated: &amp;quot, generated)
+        print()</span><span class="code-block--tools"><button data-action="copy"><svg width="20" height="20" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></span></pre><p class="md-block-unstyled md-block-rtl">با اجرای کد، ده متن با diversity های مختلف تولید میشود :</p><figure class="md-block-image md-block-ltr"><img src="https://files.virgool.io/upload/users/1223901/posts/rynq4emx1qcx/plrkjthnkq7a.png" alt="" data-action="zoom"></figure><p class="md-block-unstyled md-block-rtl">متن ورودی به صورت تصادفی از خود متن اصلی انتخاب میشود اما شما میتوانید متن خود را به مدل بدهید.</p><hr class="md-block-hr md-block-ltr"><h4 class="md-block-header-four md-block-rtl">بررسی اشعار تولید شده</h4><blockquote class="md-block-blockquote md-block-rtl">به خاک نشینی که بر سر خود از در آن چه اند<br>گر چه ما به دست است و دل بر این خواهد شد</blockquote><blockquote class="md-block-blockquote md-block-rtl">ما نگه از دوست ما به در میان بود<br>به رخسان من و ماه می و مهر ما را</blockquote><blockquote class="md-block-blockquote md-block-rtl">هر که به یاد به باد صبا به میان بود<br>به خون می کن که زیرکش که من می برد از او</blockquote><blockquote class="md-block-blockquote md-block-rtl">که در دل از او تو به ملامت می برد<br>تو به پیش کام دل ما نازک سخن بده</blockquote><blockquote class="md-block-blockquote md-block-rtl">از لب گل صفیه و دارد سحر پرده کنم<br>حافظ ار خاطر و خال ما و ز بر بخت نیک</blockquote><h4 class="md-block-header-four md-block-rtl">بهبود مدل</h4><p class="md-block-unstyled md-block-rtl">برای بهبود نتایج مدل چند کار میشه انجام داد :</p><ol class="md-block-ordered-list-item md-block-rtl"><li>استفاده از مدل پیچیده تر(در اینجا ما فقط از یک لایه LSTM آنهم با 128 واحد حافظه استفاده کرده ایم، استفاده از LSTM های بیشتر و لایه Dropout نتیجه را بهبود میبخشد).</li><li>متن بهتر(متنی که استفاده کردیم حدود 300 هزار کارکتر داشت، توصیه میشه برای داشتن مدل بهتر از متنی با بیش از یک میلیون کارکتر استفاده شود).</li></ol><hr class="md-block-hr md-block-ltr"><p class="md-block-unstyled md-block-rtl">نوت بوک این مطلب روی گیت هاب به آدرس زیر موجود است:</p><figure class="md-block-embed md-block-ltr"><a href="https://github.com/bistcuite/virgool-machine-learning/blob/main/lstm/text-generation-keras-lstm.ipynb" style="display: none;"> https://github.com/bistcuite/virgool-machine-learning/blob/main/lstm/text-generation-keras-lstm.ipynb </a></figure><h4 class="md-block-header-four md-block-rtl">منابع</h4><ol class="md-block-ordered-list-item md-block-ltr"><li><a class="md-inline-link" href="https://l.vrgl.ir/r?l=https%3A%2F%2Fkeras.io%2Fexamples%2Fgenerative%2Flstm_character_level_text_generation&amp;st=post&amp;si=rynq4emx1qcx&amp;k=zOeyx437OR3QeCv%2FjB2XsCf%2FKnNqtlaItVc2Q19BFN8%3D" target="_blank" rel="noopener nofollow">https://keras.io/examples/generative/lstm_character_level_text_generation</a></li><li><a class="md-inline-link" href="https://l.vrgl.ir/r?l=https%3A%2F%2Fwww.tensorflow.org%2Ftext%2Ftutorials%2Ftext_generation&amp;st=post&amp;si=rynq4emx1qcx&amp;k=Xo01%2F3zx8TbOD5M81Hr6UKoAcHyw2%2BJdd4Nn9ESMbxg%3D" target="_blank" rel="noopener nofollow">https://www.tensorflow.org/text/tutorials/text_generation</a></li><li><a class="md-inline-link" href="https://l.vrgl.ir/r?l=https%3A%2F%2Fkarpathy.github.io%2F2015%2F05%2F21%2Frnn-effectiveness%2F&amp;st=post&amp;si=rynq4emx1qcx&amp;k=EziJtl8Ly0STV%2F5NYRTMCZtbkrG7r%2FW42DFNlIUC0nA%3D" target="_blank" rel="noopener nofollow">https://karpathy.github.io/2015/05/21/rnn-effectiveness</a></li><li>Natural Language Processing IN Action, Manning Publication</li><li><a class="md-inline-link" href="https://l.vrgl.ir/r?l=https%3A%2F%2Fgithub.com%2Famnghd%2FPersian_poems_corpus&amp;st=post&amp;si=rynq4emx1qcx&amp;k=vqnt5%2F3s7HTiF0xPTRd3SBaWSAgB%2BmuEJlpNoYX5QIU%3D" target="_blank" rel="noopener nofollow">https://github.com/amnghd/Persian_poems_corpus</a></li></ol     </div>
+   </footer>
+
+</article>
